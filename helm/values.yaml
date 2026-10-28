@@ -1,0 +1,93 @@
+# kube-prometheus-stack 92.14.1 (Prometheus Operator v0.94.2)
+#
+# Sized for this Minikube node, which also runs Kubeflow and the lab apps.
+# A dedicated production cluster would use replicas: 2, a larger disk, and
+# retention: 15d. Shards stay at 1 until one Prometheus runs out of memory.
+#
+# Install:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm repo update
+#   helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#     --version 92.14.1 \
+#     --namespace monitoring \
+#     --create-namespace \
+#     -f helm/values.yaml
+
+prometheus:
+  prometheusSpec:
+    replicas: 1
+    shards: 3
+    retention: 2d
+    retentionSize: 1500MB
+    scrapeInterval: 30s
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: standard
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 2Gi
+
+alertmanager:
+  alertmanagerSpec:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 128Mi
+
+grafana:
+  adminPassword: prom-operator
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 20Mi
+    limits:
+      memory: 64Mi
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+# Minikube does not expose these control-plane endpoints.
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false

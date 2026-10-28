@@ -1,0 +1,95 @@
+# Hand-written Prometheus for the original lab.
+# The cluster install is Helm: helm/values.yaml. Do not apply this file
+# while the kube-prometheus-stack release is installed.
+#
+# Prometheus Operator turns ServiceMonitors into scrape targets.
+# This file has no scrape config. A new app is a new ServiceMonitor, not a new job here.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: lab
+---
+# Lists pods, Services, and endpoints so each ready pod can be a scrape target.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: lab-prometheus
+rules:
+  # ServiceMonitor discovery uses the endpoints role, which reads these three.
+  - apiGroups: [""]
+    resources:
+      - services
+      - endpoints
+      - pods
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: lab-prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: lab-prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: lab
+---
+# The operator creates a StatefulSet from this object and writes the TSDB to the claim below.
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prometheus
+  namespace: lab
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  # Operator 0.94 writes storage.tsdb.retention into the config file.
+  # That field exists in Prometheus 3, which is the version this operator runs.
+  image: prom/prometheus:v3.14.0
+  retention: 15d
+  serviceAccountName: prometheus
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    fsGroup: 65534
+  serviceMonitorNamespaceSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: prometheus-java-lab
+  serviceMonitorSelector: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+---
+# Query UI and API. From your machine:
+# kubectl -n lab port-forward svc/prometheus 9090:9090
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: lab
+  labels:
+    app: prometheus
+spec:
+  selector:
+    app.kubernetes.io/name: prometheus
+    operator.prometheus.io/name: prometheus
+  ports:
+    - name: web
+      port: 9090
+      targetPort: web

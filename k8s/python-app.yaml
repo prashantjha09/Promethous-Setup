@@ -1,0 +1,81 @@
+# One Python process. The ServiceMonitor below scrapes each ready pod of this Deployment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-app
+  namespace: lab
+  labels:
+    app: python-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: python-app
+  template:
+    metadata:
+      labels:
+        app: python-app
+    spec:
+      containers:
+        - name: python-app
+          # Built from python-app/Dockerfile and loaded into the cluster.
+          image: python-app:0.0.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+# Stable address inside the cluster. Prometheus does not scrape this ClusterIP.
+# It scrapes each address in the Endpoints of this Service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: python-app
+  namespace: lab
+  labels:
+    app: python-app
+spec:
+  selector:
+    app: python-app
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: python-app
+  namespace: lab
+  labels:
+    app: python-app
+    # kube-prometheus-stack only scrapes ServiceMonitors with its release label.
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: python-app
+  jobLabel: app
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

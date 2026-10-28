@@ -1,0 +1,21 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: demo
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  # Added to every metric line, so a query can select this app:
+  # jvm_memory_used_bytes{application="demo", area="heap"}
+  metrics:
+    tags:
+      application: demo

@@ -1,0 +1,32 @@
+# Alert rules for the lab apps. The Helm release label is what makes
+# kube-prometheus-stack load this object.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: lab-apps
+  namespace: lab
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: lab-apps
+      rules:
+        - alert: JavaHeapFilling
+          expr: |
+            (
+              jvm_memory_used_bytes{job="java-app", area="heap"}
+              /
+              jvm_memory_max_bytes{job="java-app", area="heap"}
+            ) > 0.9
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Java heap is above 90% on {{ $labels.pod }}
+        - alert: AppTargetDown
+          expr: up{job=~"java-app|python-app"} == 0
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.job }} on {{ $labels.pod }} is down"

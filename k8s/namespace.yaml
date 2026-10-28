@@ -1,0 +1,7 @@
+# Isolates this exercise from other workloads on the cluster.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab
+  labels:
+    app.kubernetes.io/part-of: prometheus-java-lab
